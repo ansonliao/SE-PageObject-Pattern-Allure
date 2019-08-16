@@ -1,0 +1,123 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'ru.vyarus.quality' version '2.2.0'
+    id "io.qameta.allure" version "2.7.0"
+    id 'com.novoda.static-analysis' version '0.8'
+    id 'checkstyle'
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+[compileJava, compileTestJava]*.options*.compilerArgs = ['-parameters']
+
+configurations {
+    agent
+}
+
+group 'com.github.ansonliao'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    jcenter()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    agent 'org.aspectj:aspectjweaver:1.9.4'
+    def withoutJunit = {
+        exclude group: 'junit', module: 'junit'
+        exclude group: 'org.junit.jupiter', module: 'junit-jupiter-api'
+    }
+
+    implementation 'com.github.ansonliao:Selenium-Extensions:2.3.7', withoutJunit
+
+    // https://mvnrepository.com/artifact/io.qameta.allure/allure-testng
+    compile group: 'io.qameta.allure', name: 'allure-testng', version: '2.12.1'
+
+    // https://mvnrepository.com/artifact/ru.yandex.qatools.htmlelements/htmlelements-java
+    compile group: 'ru.yandex.qatools.htmlelements', name: 'htmlelements-java', version: '1.20.0'
+
+    // https://mvnrepository.com/artifact/io.github.sskorol/test-data-supplier
+    compile group: 'io.github.sskorol', name: 'test-data-supplier', version: '1.7.0'
+
+    // https://mvnrepository.com/artifact/com.automation-remarks/video-recorder-testng
+    compile group: 'com.automation-remarks', name: 'video-recorder-testng', version: '2.0'
+
+    // https://mvnrepository.com/artifact/com.beust/jcommander
+    compile group: 'com.beust', name: 'jcommander', version: '1.72'
+
+    // https://mvnrepository.com/artifact/one.util/streamex
+    compile group: 'one.util', name: 'streamex', version: '0.6.8'
+
+    // https://mvnrepository.com/artifact/org.assertj/assertj-core
+    testCompile group: 'org.assertj', name: 'assertj-core', version: '3.12.2'
+
+    // https://mvnrepository.com/artifact/org.testng/testng
+    testCompile group: 'org.testng', name: 'testng', version: '6.14.3'
+}
+
+[compileJava, compileTestJava]*.options*.compilerArgs = ['-parameters']
+
+test.doFirst {
+    jvmArgs "-javaagent:${configurations.agent.singleFile}"
+
+    systemProperty 'allure.model.indentOutput', true
+    systemProperty 'allure.results.directory', 'build/allure-results'
+    systemProperty 'allure.link.issue.pattern', 'https://github.com/allure-framework/allure-docs/issues/{}'
+    systemProperty 'allure.link.tms.pattern', 'https://github.com/allure-framework/allure-docs/issues/{}'
+}
+
+task runTest(type: JavaExec) {
+    classpath(sourceSets.main.runtimeClasspath, sourceSets.test.runtimeClasspath)
+
+    if (project.hasProperty('wdm.chromeDriverVersion')) {
+        systemProperty 'wdm.chromeDriverVersion', findProperty('wdm.chromeDriverVersion')
+    } else {
+        systemProperty 'wdm.chromeDriverVersion', '76.0.3809.68'
+    }
+
+    main = 'com.github.ansonliao.selenium.runner.MyTestRunner'
+    args 'hello', 'world'
+}
+
+runTest.doFirst {
+    jvmArgs "-javaagent:${configurations.agent.singleFile}"
+
+    systemProperty 'allure.model.indentOutput', true
+    systemProperty 'allure.results.directory', 'build/allure-results'
+    systemProperty 'allure.link.issue.pattern', 'https://github.com/allure-framework/allure-docs/issues/{}'
+    systemProperty 'allure.link.tms.pattern', 'https://github.com/allure-framework/allure-docs/issues/{}'
+}
+
+task generateAllureReport(type: Exec) {
+    executable 'sh'
+    args './gradlew', 'allureReport'
+}
+
+task cleanBuildDir(type: Delete) {
+    delete 'allure-report'
+    delete 'allure-reports'
+    delete 'allure-results'
+    delete 'test-output'
+    delete 'target'
+    delete '.allure'
+}
+
+clean.finalizedBy(cleanBuildDir)
+runTest.finalizedBy(generateAllureReport)
+
+checkstyle {
+    toolVersion '8.8'
+    configFile file('${project.rootDir}/config/checkstyle/google-style.xml')
+    checkstyleMain {
+        source = 'src/main/java'
+    }
+}
+
+allure {
+    version = '2.12.1'
+    downloadLinkFormat = "https://dl.bintray.com/qameta/maven/io/qameta/allure/allure-commandline/%s/allure-commandline-%<s.zip"
+}
